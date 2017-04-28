@@ -1,0 +1,103 @@
+---
+title: "Machine Learning Prediction Assignment Writeup"
+author: "Julia Chen"
+date: "4/20/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. In this project, 6 participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+The goal is to use data from accelerometers on the belt, forearm, arm, and dumbell to predict the manner in which the participants did the exercise. This is the "classe" variable in the training set.
+
+## Data Source
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The data for prediction are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+## Data Cleaning
+
+There are five steps in the data cleaning procss. Each data cleaning process is applied to both training and testing data.  
+__First step__ is to download the data for modeling and prediction from urls.  
+__Second step__ is to create training and testing data sets using p=0.7.  
+__Third step__ is to find near zero covariates and eliminate them.   
+__Fourth step__ is to remove covariates with NA values. By observing data, we find there are covariates with lots of NA values(more than 90%).  
+__Last step__ is to remove the first 6 covariates(_X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, num_window_). These 6 covariates are IDs and timestamps. They are not related to our prediction of classe.
+```{r dataCleaning, message=FALSE}
+#Step One--Import data
+traindata <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"))
+predictdata <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"))
+dim(traindata)
+dim(predictdata)
+
+#Step Two--Create data partition from traindata to create training and testing data sets
+library(caret)
+inTrain <- createDataPartition(y=traindata$classe, p =0.7,list = FALSE)
+training <- traindata[inTrain,]
+testing <- traindata[-inTrain,]
+dim(training)
+dim(testing)
+
+#Step Three--Removing zero covariates
+nsv <- nearZeroVar(training)
+training <- training[,-nsv]
+testing <- testing[,-nsv]
+predictdata <- predictdata[,-nsv]
+dim(testing)
+dim(training)
+dim(predictdata)
+
+#Step Four--Removing columns with NA values
+keep <- sapply(training,function(e){sum(is.na(e))==0})
+training <- training[,keep]
+testing <- testing[,keep]
+predictdata <- predictdata[,keep]
+dim(training)
+dim(testing)
+dim(predictdata)
+
+#Step Five--Remove first 6 columns (X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, num_window).
+training <- training[,-(1:6)]
+testing <- testing[,-(1:6)]
+predictdata <- predictdata[,-(1:6)]
+dim(training)
+dim(testing)
+dim(predictdata)
+```
+
+## Predicting with machine learning
+We will check two popular machine learning techniques--boosting and random forest and compare the prediction results. We can see random forest renders a better prediction, therefore we choose using random forest to answer the quiz question. 
+
+### 1. Predicting with Boosting
+```{r BT,cache=TRUE,message=FALSE}
+set.seed(427)
+modBT <- train(classe ~ ., data=training, method="gbm", verbose=FALSE)
+modBT
+predBT <- predict(modBT,newdata=testing)
+confusionMatrix(predBT,testing$classe)
+```
+
+
+### 2. Predciting with random forest
+```{r RF, message=FALSE,cache=TRUE}
+library(randomForest)
+set.seed(427)
+modRF<- randomForest(classe ~ ., training,ntree=500)
+modRF
+predRF <- predict(modRF,testing)
+confusionMatrix(predRF,testing$classe)
+```
+
+
+##Course Project Prediction Quiz Answer
+```{r quiz}
+predQuiz <- predict(modRF,newdata=predictdata)
+predQuiz
+```
+
